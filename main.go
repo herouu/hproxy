@@ -30,7 +30,6 @@ func (ss *SystemService) Start(s service.Service) error {
 }
 
 func (ss *SystemService) run() {
-	//h := &handle{reverseProxy: ss.reverseProxy, ip: ss.ip}
 	srv := &http.Server{}
 	srv.Addr = ss.bind
 	srv.Handler = ss
@@ -99,7 +98,10 @@ func main() {
 
 	app.Action = startAction
 	app.Version = "1.0.0"
-	app.Run(os.Args)
+	err := app.Run(os.Args)
+	if err != nil {
+		return
+	}
 }
 
 func createSystemService(c *cli.Context) (service.Service, error) {
@@ -110,6 +112,7 @@ func createSystemService(c *cli.Context) (service.Service, error) {
 		Name:        ss.serviceName,
 		DisplayName: ss.serviceName,
 		Description: fmt.Sprintf("this is %s service.", ss.serviceName),
+		Arguments:   []string{"--bind", ss.bind, "--remote", ss.reverseProxy, "--ip", ss.ip},
 	}
 
 	s, err := service.New(ss, svcConfig)
@@ -126,6 +129,7 @@ func ctrlAction(c *cli.Context) error {
 		return err
 	}
 	err = service.Control(s, c.Command.Name)
+	log.Printf("ctrl action is %s", c.Command.Name)
 	if err != nil {
 		log.Printf("service Run %s failed, err: %v\n", c.String("name"), err)
 		return err
@@ -176,4 +180,15 @@ func (h *SystemService) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	proxy := httputil.NewSingleHostReverseProxy(remote)
 	r.Host = remote.Host
 	proxy.ServeHTTP(w, r)
+}
+
+func init() {
+	logFile, err := os.OpenFile("./hproxy.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		fmt.Println("open log file failed, err:", err)
+		return
+	}
+	log.SetOutput(logFile)
+	log.SetFlags(log.Lshortfile | log.Lmicroseconds | log.Ldate)
+
 }
